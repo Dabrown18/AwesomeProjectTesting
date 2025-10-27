@@ -1,37 +1,39 @@
-mkdir -p ci_scripts
-cat > ci_scripts/ci_post_clone.sh <<'SH'
 #!/bin/sh
 set -euo pipefail
 
-echo "Xcode Cloud, post clone starting"
+# always start at repo root
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_ROOT"
 
-# Install JS deps
+echo "Xcode Cloud, post clone starting in $REPO_ROOT"
+
+# Install JS deps at repo root
 if [ -f "package-lock.json" ]; then
   echo "npm ci"
   npm ci
 elif [ -f "yarn.lock" ]; then
   echo "yarn install"
   yarn install --frozen-lockfile || yarn install
+else
+  echo "No lockfile found, skipping JS install"
 fi
 
 # Install iOS Pods
-cd ios
-if [ -f "Gemfile" ]; then
-  echo "bundle exec pod install"
-  gem install bundler --no-document || true
-  bundle install
-  bundle exec pod install --repo-update
+if [ -d "ios" ]; then
+  cd ios
+  if [ -f "Gemfile" ]; then
+    echo "bundle exec pod install"
+    gem install bundler --no-document || true
+    bundle install
+    bundle exec pod install --repo-update
+  else
+    echo "pod install"
+    pod install --repo-update
+  fi
 else
-  echo "pod install"
-  pod install --repo-update
+  echo "Expected ios directory at $REPO_ROOT/ios, not found"
+  exit 1
 fi
 
 echo "post clone complete"
-SH
-
-# Make sure the file uses LF endings and is executable
-dos2unix ci_scripts/ci_post_clone.sh 2>/dev/null || true
-git add ci_scripts/ci_post_clone.sh
-git update-index --chmod=+x ci_scripts/ci_post_clone.sh
-git commit -m "Xcode Cloud, add post clone script for JS deps and CocoaPods"
-git push
