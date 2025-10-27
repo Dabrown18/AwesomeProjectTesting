@@ -1,32 +1,37 @@
+mkdir -p ci_scripts
+cat > ci_scripts/ci_post_clone.sh <<'SH'
 #!/bin/sh
 set -euo pipefail
 
-echo "Xcode Cloud: post-clone setup"
+echo "Xcode Cloud, post clone starting"
 
-# 1) install JS deps
+# Install JS deps
 if [ -f "package-lock.json" ]; then
-  echo "Installing JS deps with npm ci"
+  echo "npm ci"
   npm ci
 elif [ -f "yarn.lock" ]; then
-  echo "Installing JS deps with yarn"
+  echo "yarn install"
   yarn install --frozen-lockfile || yarn install
-else
-  echo "No lockfile found, skipping JS install"
 fi
 
-# 2) install iOS pods
+# Install iOS Pods
 cd ios
-
-# If you use a Gemfile with a specific Cocoapods version, prefer bundler
 if [ -f "Gemfile" ]; then
-  echo "Installing Ruby gems via bundler"
+  echo "bundle exec pod install"
   gem install bundler --no-document || true
   bundle install
-  echo "Running pod install via bundler"
   bundle exec pod install --repo-update
 else
-  echo "Running pod install"
+  echo "pod install"
   pod install --repo-update
 fi
 
-echo "Post-clone complete"
+echo "post clone complete"
+SH
+
+# Make sure the file uses LF endings and is executable
+dos2unix ci_scripts/ci_post_clone.sh 2>/dev/null || true
+git add ci_scripts/ci_post_clone.sh
+git update-index --chmod=+x ci_scripts/ci_post_clone.sh
+git commit -m "Xcode Cloud, add post clone script for JS deps and CocoaPods"
+git push
